@@ -336,6 +336,7 @@
 <!-- ══════════════ HEADER ══════════════ -->
 <header>
   <div class="logo">
+    <a href="/" style="font-size:.8rem;color:#8b949e;text-decoration:none;margin-right:16px;letter-spacing:.05em;">← jprbuilds.com</a>
     <span>☀️ <em>Solar</em> Dashboard</span>
   </div>
   <div class="header-right">
@@ -755,66 +756,23 @@
 // ══════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════
-const DEFAULT_HA_URL   = 'https://ugr842fd0a5ybjvvt9s18o8mppb06skt.ui.nabu.casa';
-const DEFAULT_HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkOWExYTQxZWFlNGE0N2QzYmQ1MjdkMWVhMDBlMTZlNyIsImlhdCI6MTc3NjI4NjMzMSwiZXhwIjoyMDkxNjQ2MzMxfQ.tBTvwsOs5mekQBGrdHzapXIpsXZM62YIFjegOdmywgc';
-let HA_URL   = localStorage.getItem('solar_ha_url')   || DEFAULT_HA_URL;
-let HA_TOKEN = localStorage.getItem('solar_ha_token') || DEFAULT_HA_TOKEN;
+const REFRESH_INTERVAL = 30000; // 30 seconds
+let refreshTimer = null;
+let countdown = 30;
 
 let monthlyChartInstance = null;
 let yearlyChartInstance  = null;
 let monthlyDataLoaded    = false;
 
-// ══════════════════════════════════════
-//  WEBSOCKET ENGINE
-// ══════════════════════════════════════
-let ws = null;
-let wsId = 1;
-let wsReconnectTimer = null;
-let wsReconnectDelay = 3000;
-let wsPingTimer = null;
-
-function wsUrl() {
-  return HA_URL.replace(/^http/, 'ws') + '/api/websocket';
-}
-
-// Always hide setup overlay on load — credentials are pre-configured
+// Always hide setup overlay — not needed with Solis API
 document.getElementById('setup-overlay').classList.add('hidden');
 initDashboard();
 
-function saveSettings() {
-  const url = document.getElementById('ha-url').value.trim().replace(/\/$/, '') || DEFAULT_HA_URL;
-  const tok = document.getElementById('ha-token').value.trim();
-  if (!tok) { alert('Please enter your access token.'); return; }
-  HA_URL   = url;
-  HA_TOKEN = tok;
-  localStorage.setItem('solar_ha_url',   HA_URL);
-  localStorage.setItem('solar_ha_token', HA_TOKEN);
-  document.getElementById('setup-overlay').classList.add('hidden');
-  initDashboard();
-}
-
-function openSettings() {
-  document.getElementById('ha-url').value   = HA_URL   || DEFAULT_HA_URL;
-  document.getElementById('ha-token').value = HA_TOKEN || DEFAULT_HA_TOKEN;
-  document.getElementById('skip-btn').style.display = 'inline-block';
-  document.getElementById('setup-overlay').classList.remove('hidden');
-}
+function saveSettings() {}
+function openSettings() {}
 
 // ══════════════════════════════════════
-//  HA REST (for statistics only)
-// ══════════════════════════════════════
-async function haPost(path, body) {
-  const r = await fetch(`${HA_URL}${path}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) throw new Error(`HA ${r.status} ${path}`);
-  return r.json();
-}
-
-// ══════════════════════════════════════
-//  STATE MAP  (populated via WebSocket)
+//  STATE MAP  (populated via Solis proxy)
 // ══════════════════════════════════════
 let stateMap = {};
 
@@ -830,94 +788,42 @@ function str(eid, def = '—') {
 }
 
 // ══════════════════════════════════════
-//  WEBSOCKET CONNECTION
+//  FETCH FROM SOLIS PROXY
 // ══════════════════════════════════════
-function connectWS() {
-  clearTimeout(wsReconnectTimer);
-  clearInterval(wsPingTimer);
-  if (ws) { try { ws.close(); } catch(e) {} }
+async function fetchAllStates() {
+  const r = await fetch('/solar/proxy.php?action=states');
+  if (!r.ok) throw new Error(`Proxy error ${r.status}`);
+  const arr = await r.json();
+  stateMap = {};
+  for (const s of arr) { stateMap[s.entity_id] = s; }
+  return stateMap;
+}
 
-  setBadge(false, 'Connecting…');
-  ws = new WebSocket(wsUrl());
+async function refresh() {
+  try {
+    setBadge(false, 'Updating…');
+    await fetchAllStates();
+    updateLiveUI();
+    renderYearlyChart();
+    setBadge(true, 'Live');
+    document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB')}`;
+  } catch(e) {
+    console.error('Refresh failed:', e);
+    setBadge(false, 'Offline');
+  }
+}
 
-  ws.onopen = () => {
-    console.log('WS open');
-    wsReconnectDelay = 3000;
-  };
-
-  ws.onmessage = (evt) => {
-    const msg = JSON.parse(evt.data);
-
-    // Step 1: auth required
-    if (msg.type === 'auth_required') {
-      ws.send(JSON.stringify({ type: 'auth', access_token: HA_TOKEN }));
-      return;
+function startCountdown() {
+  clearInterval(refreshTimer);
+  countdown = REFRESH_INTERVAL / 1000;
+  refreshTimer = setInterval(() => {
+    countdown--;
+    document.getElementById('refresh-countdown').textContent = `Refresh in ${countdown}s`;
+    if (countdown <= 0) {
+      countdown = REFRESH_INTERVAL / 1000;
+      refresh();
     }
-
-    // Step 2: auth ok — subscribe to all entity state changes
-    if (msg.type === 'auth_ok') {
-      console.log('WS auth OK, HA version:', msg.ha_version);
-      // Subscribe to state-changed events
-      ws.send(JSON.stringify({ id: wsId++, type: 'subscribe_events', event_type: 'state_changed' }));
-      // Also fetch all current states snapshot
-      ws.send(JSON.stringify({ id: wsId++, type: 'get_states' }));
-      // Keep-alive ping every 30s
-      wsPingTimer = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ id: wsId++, type: 'ping' }));
-        }
-      }, 30000);
-      return;
-    }
-
-    if (msg.type === 'auth_invalid') {
-      setBadge(false, 'Auth failed');
-      console.error('WS auth invalid');
-      return;
-    }
-
-    // Step 3: result from get_states — bulk populate stateMap
-    if (msg.type === 'result' && Array.isArray(msg.result)) {
-      stateMap = {};
-      for (const s of msg.result) { stateMap[s.entity_id] = s; }
-      updateLiveUI();
-      renderYearlyChart();
-      setBadge(true, 'Live');
-      document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB')}`;
-      return;
-    }
-
-    // Step 4: real-time state_changed events
-    if (msg.type === 'event' && msg.event && msg.event.event_type === 'state_changed') {
-      const ns = msg.event.data.new_state;
-      if (ns) {
-        stateMap[ns.entity_id] = ns;
-        // Only re-render if it's one of our solar entities
-        if (ns.entity_id.startsWith('sensor.solis') ||
-            ns.entity_id.startsWith('sensor.solcast') ||
-            ns.entity_id.startsWith('sensor.best_solar') ||
-            ns.entity_id.startsWith('input_number.max_daily')) {
-          updateLiveUI();
-          document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB')}`;
-        }
-      }
-    }
-  };
-
-  ws.onerror = (e) => {
-    console.error('WS error', e);
-    setBadge(false, 'Error');
-  };
-
-  ws.onclose = (e) => {
-    clearInterval(wsPingTimer);
-    setBadge(false, `Reconnecting…`);
-    console.warn('WS closed, reconnecting in', wsReconnectDelay, 'ms');
-    wsReconnectTimer = setTimeout(() => {
-      wsReconnectDelay = Math.min(wsReconnectDelay * 1.5, 30000);
-      connectWS();
-    }, wsReconnectDelay);
-  };
+  }, 1000);
 }
 
 // ══════════════════════════════════════
@@ -1163,35 +1069,13 @@ async function loadMonthlyStats() {
   document.getElementById('monthly-chart-wrap').style.display = 'none';
 
   try {
-    // Get 12 months back from start of this month
-    const now    = new Date();
-    const start  = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-    const startISO = start.toISOString();
+    const months = await (await fetch('/solar/proxy.php?action=monthly')).json();
+    if (!months || months.error || months.length === 0) throw new Error('No monthly data');
 
-    const data = await haPost('/api/recorder/statistics_during_period', {
-      start_time: startISO,
-      period: 'month',
-      statistic_ids: [
-        'sensor.solis_energy_total',
-        'sensor.solis_total_on_grid_energy',
-        'sensor.solis_total_energy_purchased'
-      ],
-      types: ['change']
-    });
-
-    const genChanges  = data['sensor.solis_energy_total']    || [];
-    const expChanges  = data['sensor.solis_total_on_grid_energy'] || [];
-    const impChanges  = data['sensor.solis_total_energy_purchased'] || [];
-
-    if (genChanges.length === 0) throw new Error('No statistics returned');
-
-    const labels = genChanges.map(d => {
-      const dt = new Date(d.start);
-      return dt.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
-    });
-    const genVals = genChanges.map(d => Math.max(0, d.change || 0));
-    const expVals = expChanges.map(d => Math.max(0, d.change || 0));
-    const impVals = impChanges.map(d => Math.max(0, d.change || 0));
+    const labels  = months.map(m => m.label).reverse();
+    const genVals = months.map(m => parseFloat(m.data.energy ?? m.data.generationValue ?? 0)).reverse();
+    const expVals = months.map(m => parseFloat(m.data.gridSellEnergy ?? 0)).reverse();
+    const impVals = months.map(m => parseFloat(m.data.gridBuyEnergy ?? 0)).reverse();
 
     renderMonthlyChart(labels, genVals, expVals, impVals);
     renderMonthlyTable(labels, genVals, expVals, impVals);
@@ -1323,12 +1207,11 @@ function setBadge(online, label) {
   const t = document.getElementById('live-text');
   b.className = `live-badge ${online ? '' : 'offline'}`;
   t.textContent = label || (online ? 'Live' : 'Offline');
-  // Hide old countdown — WS is push-based
-  document.getElementById('refresh-countdown').textContent = online ? '🔴 Real-time' : '';
 }
 
-function initDashboard() {
-  connectWS();
+async function initDashboard() {
+  await refresh();
+  startCountdown();
 }
 
 // ══════════════════════════════════════
