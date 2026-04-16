@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal Project Showcase</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles to mimic Netflix's look and feel */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(circle at top, rgba(0, 173, 239, 0.12), transparent 28%),
+                radial-gradient(circle at right top, rgba(255, 255, 255, 0.06), transparent 22%),
+                #141414;
+            color: #e5e5e5;
+            min-height: 100vh;
+        }
+
+        .site-header {
+            transition: background-color 0.25s ease, backdrop-filter 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .site-header.scrolled {
+            background: rgba(12, 12, 12, 0.88);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+        }
+
+        .skip-link {
+            position: absolute;
+            left: 1rem;
+            top: -3rem;
+            background: #ffffff;
+            color: #141414;
+            padding: 0.75rem 1rem;
+            border-radius: 999px;
+            font-weight: 700;
+            z-index: 100;
+            transition: top 0.2s ease;
+        }
+
+        .skip-link:focus {
+            top: 1rem;
+        }
+
+        /* Custom scrollbar for a more polished look */
+        .carousel-container::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .carousel-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .carousel-container::-webkit-scrollbar-thumb {
+            background-color: #444;
+            border-radius: 20px;
+            border: 3px solid #141414;
+        }
+
+        .carousel-container {
+            scroll-snap-type: x proximity;
+            padding-bottom: 0.5rem;
+        }
+
+        /* Gradient overlay for the hero section */
+        .hero-gradient {
+            background-image:
+                linear-gradient(to top, rgba(20, 20, 20, 1) 8%, rgba(20, 20, 20, 0.7) 26%, transparent 60%),
+                linear-gradient(to right, rgba(20, 20, 20, 0.82), rgba(20, 20, 20, 0.18) 45%, transparent 70%);
+        }
+
+        .hero-panel {
+            background: linear-gradient(135deg, rgba(15, 15, 15, 0.74), rgba(15, 15, 15, 0.22));
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+        }
+
+        .hero-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.45rem 0.9rem;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .hero-stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 0.95rem;
+        }
+
+        .section-description {
+            color: rgba(229, 229, 229, 0.7);
+            max-width: 48rem;
+            margin-top: 0.35rem;
+        }
+
+        .section-shell {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 1.5rem;
+            padding-top: 1rem;
+            padding-bottom: 0.75rem;
+        }
+
+        /* Transition for hover effect on thumbnails */
+        .thumbnail {
+            transition: transform 0.25s ease-out, z-index 0.25s ease-out, box-shadow 0.25s ease-out, border-color 0.25s ease-out;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+            scroll-snap-align: start;
+        }
+
+        .thumbnail img {
+            transition: transform 0.45s ease, filter 0.3s ease;
+        }
+
+        .thumbnail::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(8, 8, 8, 0.45), transparent 55%);
+            opacity: 0.9;
+            pointer-events: none;
+        }
+
+        .thumbnail > div:last-child {
+            background: linear-gradient(180deg, rgba(0, 173, 239, 0.92), rgba(0, 110, 160, 0.96)) !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+        }
+
+        /* The hover effect: scale up and bring to front */
+        .thumbnail:hover {
+            transform: translateY(-6px) scale(1.08);
+            z-index: 10;
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 22px 40px rgba(0, 0, 0, 0.34);
+        }
+
+        .thumbnail:hover img,
+        .thumbnail:focus-visible img {
+            transform: scale(1.06);
+            filter: saturate(1.04) contrast(1.04);
+        }
+
+        .thumbnail:focus-visible,
+        button:focus-visible,
+        a:focus-visible {
+            outline: 3px solid #00adef;
+            outline-offset: 3px;
+        }
+
+        .thumbnail:focus-visible {
+            transform: translateY(-4px) scale(1.05);
+            z-index: 10;
+        }
+
+        /* Prevent body scroll while hovering on a scaled image */
+        .carousel-container:hover .thumbnail {
+            transform-origin: center;
+        }
+
+        /* Modal fade-in/out */
+        #modal-backdrop {
+            transition: opacity 0.3s ease-out;
+        }
+        #modal {
+            transition: transform 0.3s ease-out;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: linear-gradient(180deg, rgba(24, 24, 24, 0.98), rgba(17, 17, 17, 0.98));
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+        }
+        
+        /* Gradient on modal image to make text readable */
+        .modal-image-gradient {
+            background: linear-gradient(to top, rgba(24, 24, 24, 0.9) 10%, rgba(24, 24, 24, 0) 50%);
+        }
+
+        #modal-description {
+            line-height: 1.7;
+        }
+    </style>
+</head>
+<body class="overflow-x-hidden">
+
+    <a href="#top" class="skip-link">Skip to content</a>
+
+    <!-- HEADER / NAVIGATION -->
+    <header id="site-header" class="site-header fixed top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-4 sm:p-6 z-50">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4 sm:space-x-8">
+                <!-- IMPORTANT: Replace this with your company logo if you have one -->
+                <h1 class="text-2xl sm:text-3xl font-black text-red-600 uppercase">Showcase</h1>
+                <nav class="hidden md:flex items-center space-x-4">
+                    <a href="#top" class="font-bold text-white">Home</a>
+                    <a href="#series-1" class="text-gray-300 hover:text-white transition">Series 1</a>
+                    <a href="#series-1-cont" class="text-gray-300 hover:text-white transition">Series 1 Cont.</a>
+                    <a href="#series-2" class="text-gray-300 hover:text-white transition">Series 2</a>
+                    <a href="Presentation.html" class="text-gray-300 hover:text-white transition">Showcase</a>
+                </nav>
+            </div>
+            <div class="flex items-center space-x-4 sm:space-x-6">
+                 <!-- Search Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <a href="https://mercedes-benzstarhub.workvivo.com/spaces/71491/pages/about-us" target="_blank" rel="noopener noreferrer" class="hidden sm:inline text-gray-300 hover:text-white transition">Team</a>
+                <!-- Bell Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                 <!-- Profile Icon -->
+                <div class="w-8 h-8 bg-blue-500 rounded-md cursor-pointer">
+                    <img src="https://placehold.co/32x32/3B82F6/FFFFFF?text=You" alt="User Profile" class="w-full h-full object-cover rounded-md">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main id="top">
+        <!-- HERO SECTION -->
+        <section class="relative h-[56.25vw] min-h-[380px] max-h-[860px] w-full">
+            <!-- 
+                INSTRUCTIONS FOR HERO IMAGE:
+                Replace the 'src' below with the path to your main, most impressive screenshot.
+                This should be a high-resolution image.
+            -->
+            <img src="images/TWiT.png" alt="This Week in Training featured artwork" fetchpriority="high" class="absolute top-0 left-0 w-full h-full object-cover">
+            <div class="absolute inset-0 hero-gradient"></div>
+            <div class="hero-panel absolute bottom-[14%] left-4 sm:left-6 md:left-16 max-w-2xl rounded-3xl px-5 py-6 sm:px-7 sm:py-8 text-white">
+                <div class="mb-4 flex flex-wrap gap-3">
+                    <span class="hero-chip">Featured Training</span>
+                    <span class="hero-chip">Series Library</span>
+                </div>
+                <h2 class="text-3xl sm:text-5xl md:text-6xl font-black drop-shadow-xl">This Week in Training Series 2</h2>
+                <p class="mt-4 text-sm sm:text-base md:text-lg max-w-lg drop-shadow-lg">
+                    A streamlined internal library for GTLS learning content, with faster discovery across Series 1 and Series 2.
+                </p>
+                <div class="mt-4 flex flex-wrap gap-4">
+                    <span class="hero-stat"><span class="h-2 w-2 rounded-full bg-emerald-400"></span>Series 1 archive included</span>
+                    <span class="hero-stat"><span class="h-2 w-2 rounded-full bg-sky-400"></span>Series 2 front and center</span>
+                </div>
+                <div class="mt-6 flex space-x-3">
+                    <button id="hero-play-button" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/episode_2__batteries_v4+(1080p).mp4" aria-haspopup="dialog" class="flex items-center justify-center bg-white text-black font-bold rounded-md px-6 sm:px-8 py-2 text-lg hover:bg-opacity-80 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                        </svg>
+                        Play
+                    </button>
+                    <button id="hero-more-info-button" data-scroll-target="#series-1" class="flex items-center justify-center bg-gray-600/70 text-white font-bold rounded-md px-6 sm:px-8 py-2 text-lg hover:bg-gray-500/70 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        More Info
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- CAROUSEL ROWS CONTAINER -->
+        <div class="relative -mt-[8vw] sm:-mt-[4vw] space-y-5 md:space-y-8 pb-16 z-20">
+            
+            <!-- CATEGORY ROW 1 -->
+            <section id="series-1" class="section-shell mx-4 px-4 sm:mx-6 sm:px-6 md:mx-16 md:px-8 scroll-mt-28">
+                <h3 class="text-xl md:text-2xl font-bold mb-2">This Week In Training - Series 1</h3>
+                <p class="section-description text-sm md:text-base">The original series episodes, presented as a cleaner shelf so viewers can revisit foundational topics quickly.</p>
+                <div class="carousel-container flex overflow-x-auto space-x-2 md:space-x-4 py-4">
+                    
+                    <!-- Tile 1 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb.jpg" alt="Episode 1: Pre-Entry Climate" data-description="Episode 1: Pre-Entry Climate Control" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e01_this_week_in_training_-_pre_entry_climate_control_v10+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Pre-Entry Climate
+                        </div>
+                    </div>
+
+                    <!-- Tile 2 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (1).jpg" alt="Episode 2: 7 Safety Measures" data-description="Episode 2: 7 Safety Measures" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e02_this_week_in_training_-_7_safety_measures_v2+(1080p).mp4" class="w-full h-full object-cover">
+                         <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            7 Safety Measures
+                         </div>
+                    </div>
+
+                    <!-- Tile 3 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (2).jpg" alt="Episode 3: Recuperation" data-description="Episode 3: Recuperation" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e03_this_week_in_training_-_recuperation_v2+(1080p).mp4" class="w-full h-full object-cover">
+                         <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Recuperation
+                         </div>
+                    </div>
+                    
+                    <!-- Tile 4 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (3).jpg" alt="Episode 4: Interlock Circuit" data-description="Episode 4: Interlock Circuit" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e04_this_week_in_training_-_interlock_circuit_v2+(1080p).mp4" class="w-full h-full object-cover">
+                         <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Interlock Circuit
+                         </div>
+                    </div>
+
+                    <!-- Tile 5 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (4).jpg" alt="Episode 5: Cables" data-description="Episode 5: Cables" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e05_this_week_in_training_-_cables_v6+(1080p).mp4" class="w-full h-full object-cover">
+                         <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Cables
+                         </div>
+                    </div>
+
+                    <!-- Tile 6 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (5).jpg" alt="Episode 6: Driving Efficiency" data-description="Episode 6: Driving Efficiency" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e06_this_week_in_training_-_driving_efficiency_v4+(1080p).mp4" class="w-full h-full object-cover">
+                         <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Driving Efficiency
+                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CATEGORY ROW 2 -->
+            <section id="series-1-cont" class="section-shell mx-4 px-4 sm:mx-6 sm:px-6 md:mx-16 md:px-8 scroll-mt-28">
+                <h3 class="text-xl md:text-2xl font-bold mb-2">This Week In Training - Series 1 (Cont.)</h3>
+                <p class="section-description text-sm md:text-base">Continuation episodes grouped in the same visual language, making the longer back catalogue feel intentional and easy to browse.</p>
+                <div class="carousel-container flex overflow-x-auto space-x-2 md:space-x-4 py-4">
+
+                    <!-- Tile 1 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (6).jpg" alt="Episode 7: Electric Motors" data-description="Episode 7: Electric Motors" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e07_this_week_in_training_-_electric_motors+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Electric Motors
+                        </div>
+                    </div>
+
+                    <!-- Tile 2 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (7).jpg" alt="Episode 8: Software Updates" data-description="Episode 8: Software Updates" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e08_this_week_in_training_-_software_updates_v1+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Software Updates
+                        </div>
+                    </div>
+
+                    <!-- Tile 3 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (8).jpg" alt="Episode 9: Qualifications" data-description="Episode 9: Qualifications" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e09_this_week_in_training_-_qualifications_v2+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Qualifications
+                        </div>
+                    </div>
+
+                    <!-- Tile 4 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (9).jpg" alt="Episode 10: 5 Facts" data-description="Episode 10: 5 Facts" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e10_this_week_in_training_-_5_facts_v4+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            5 Facts
+                        </div>
+                    </div>
+
+                    <!-- Tile 5 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (10).jpg" alt="Episode 11: Voice Commands" data-description="Episode 11: Voice Commands" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e11_this_week_in_training_-_voice_commands_v1+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Voice Commands
+                        </div>
+                    </div>
+
+                    <!-- Tile 6 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (11).jpg" alt="Episode 12: Mythbusters" data-description="Episode 12: Mythbusters" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/e12_this_week_in_training_-_mythbusters_v2+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Mythbusters
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- CATEGORY ROW 3 -->
+            <section id="series-2" class="section-shell mx-4 px-4 sm:mx-6 sm:px-6 md:mx-16 md:px-8 scroll-mt-28">
+                <h3 class="text-xl md:text-2xl font-bold mb-2">This Week In Training - Series 2</h3>
+                <p class="section-description text-sm md:text-base">The latest collection highlighted as the lead row, reinforcing freshness while keeping playback just one click away.</p>
+                <div class="carousel-container flex overflow-x-auto space-x-2 md:space-x-4 py-4">
+
+                    <!-- Tile 1 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (12).jpg" alt="S2 E1: Seasonal Driving" data-description="Series 2, Episode 1: Seasonal Driving" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/episode_1__seasonal_driving_v6+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Seasonal Driving
+                        </div>
+                    </div>
+
+                    <!-- Tile 2 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (13).jpg" alt="S2 E2: Batteries" data-description="Series 2, Episode 2: Batteries" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/episode_2__batteries_v4+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Batteries
+                        </div>
+                    </div>
+
+                    <!-- Tile 3 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (14).jpg" alt="S2 E3: 48V Mild Hybrids" data-description="Series 2, Episode 3: 48V Mild Hybrids" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/episode_3__48v_mild_hybrids_v3+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            48V Mild Hybrids
+                        </div>
+                    </div>
+
+                    <!-- Tile 4 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (15).jpg" alt="S2 E4: The Sound of EVs" data-description="Series 2, Episode 4: The Sound of EVs" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/episode_4__the_sound_of_evs_v2+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            The Sound of EVs
+                        </div>
+                    </div>
+
+                    <!-- Tile 5 -->
+                    <div class="thumbnail w-1/3 md:w-1/4 lg:w-1/5 rounded-md cursor-pointer flex-shrink-0 overflow-hidden">
+                        <img src="images/thumb (16).jpg" alt="S2 E5: Running Out of Charge" data-description="Series 2, Episode 5: Running Out of Charge" data-video-src="https://flippercowboys-test-site-12345.s3.us-east-1.amazonaws.com/TWiT+Videos/episode_5__running_out_of_charge_v6+(1080p).mp4" class="w-full h-full object-cover">
+                        <div class="absolute bottom-0 left-0 right-0 p-2 text-center text-xs font-bold uppercase truncate px-1" style="background-color: #00adef;">
+                            Running Out of Charge
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+    
+    <!-- MODAL POP-UP -->
+    <div id="modal-backdrop" class="fixed inset-0 bg-black bg-opacity-75 z-[100] hidden flex items-center justify-center opacity-0" aria-hidden="true">
+        <div id="modal" class="relative bg-[#181818] w-11/12 max-w-4xl rounded-lg overflow-hidden shadow-xl scale-95" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description" tabindex="-1">
+            
+            <!-- Close Button -->
+            <button id="modal-close-btn" aria-label="Close dialog" class="absolute top-3 right-3 z-20 text-white bg-black/50 rounded-full p-1 hover:bg-black/80 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            
+            <!-- Video Container -->
+            <div id="video-container" class="hidden">
+                <div class="relative pt-[56.25%]"> <!-- 16:9 Aspect Ratio -->
+                    <video id="video-player" src="" title="Featured video player" controls autoplay class="absolute top-0 left-0 w-full h-full"></video>
+                </div>
+            </div>
+
+            <!-- Image & Description Container -->
+            <div id="image-container" class="hidden">
+                <!-- Background Image and Gradient -->
+                <div class="relative pt-[56.25%]"> <!-- 16:9 Aspect Ratio -->
+                    <img id="modal-image" src="" alt="Modal Image" class="absolute top-0 left-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 modal-image-gradient"></div>
+                    <div class="absolute bottom-0 left-0 p-6">
+                        <h2 id="modal-title" class="text-3xl font-bold"></h2>
+                    </div>
+                </div>
+                <!-- Description Text -->
+                <div class="p-6">
+                    <p id="modal-description" class="text-gray-300"></p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const siteHeader = document.getElementById('site-header');
+        const modalBackdrop = document.getElementById('modal-backdrop');
+        const modal = document.getElementById('modal');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        
+        const videoContainer = document.getElementById('video-container');
+        const videoPlayer = document.getElementById('video-player');
+        
+        const imageContainer = document.getElementById('image-container');
+        const modalImage = document.getElementById('modal-image');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDescription = document.getElementById('modal-description');
+        
+        const heroPlayButton = document.getElementById('hero-play-button');
+        const heroMoreInfoButton = document.getElementById('hero-more-info-button');
+        const focusableSelector = 'button, [href], iframe, [tabindex]:not([tabindex="-1"])';
+        let lastFocusedElement = null;
+
+        function getFocusableElements() {
+            return Array.from(modal.querySelectorAll(focusableSelector)).filter(element => {
+                return !element.hasAttribute('disabled') && !element.classList.contains('hidden') && (element.offsetParent !== null || element.tagName === 'IFRAME');
+            });
+        }
+
+        function syncHeaderOnScroll() {
+            if (!siteHeader) {
+                return;
+            }
+
+            siteHeader.classList.toggle('scrolled', window.scrollY > 20);
+        }
+
+        // Function to open the modal
+        function openModal(element) {
+            let videoSrc, imgSrc, title, description;
+            lastFocusedElement = document.activeElement;
+
+            // Check if the element is the hero button or a thumbnail div
+            if (element.id === 'hero-play-button') {
+                videoSrc = element.getAttribute('data-video-src');
+                title = 'This Week in Training Series 2';
+                description = 'Watch the featured episode from our latest This Week in Training series.';
+            } else {
+                // It's a thumbnail, find the image inside it
+                const imgElement = element.querySelector('img');
+                if (imgElement) {
+                    videoSrc = imgElement.getAttribute('data-video-src');
+                    imgSrc = imgElement.src;
+                    title = imgElement.alt;
+                    description = imgElement.getAttribute('data-description');
+                }
+            }
+            
+            if (videoSrc) {
+                // We have a video, show the video player
+                imageContainer.classList.add('hidden');
+                videoContainer.classList.remove('hidden');
+                videoPlayer.src = videoSrc;
+                videoPlayer.title = `${title || 'Featured'} video player`;
+            } else {
+                // No video, show the image and description
+                videoContainer.classList.add('hidden');
+                imageContainer.classList.remove('hidden');
+                modalImage.src = imgSrc || 'https://placehold.co/1280x720/181818/181818?text=Image';
+                modalTitle.textContent = title || 'No Title';
+                modalDescription.textContent = description || 'No description provided.';
+            }
+
+            // Show the modal
+            modalBackdrop.classList.remove('hidden');
+            modalBackdrop.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+            setTimeout(() => {
+                modalBackdrop.classList.remove('opacity-0');
+                modal.classList.remove('scale-95');
+                modalCloseBtn.focus();
+            }, 10); // Short delay to allow for transition
+        }
+
+        // Function to close the modal
+        function closeModal() {
+            modalBackdrop.classList.add('opacity-0');
+            modal.classList.add('scale-95');
+            modalBackdrop.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('overflow-hidden');
+            setTimeout(() => {
+                modalBackdrop.classList.add('hidden');
+                // Stop the video from playing in the background
+                videoPlayer.src = '';
+                if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                    lastFocusedElement.focus();
+                }
+            }, 300); // Match transition duration
+        }
+
+        // --- Event Listeners ---
+
+        // Listen for clicks on all thumbnail containers
+        document.querySelectorAll('.thumbnail').forEach(item => {
+            const imgElement = item.querySelector('img');
+            const title = imgElement?.alt || 'item';
+
+            item.setAttribute('role', 'button');
+            item.setAttribute('tabindex', '0');
+            item.setAttribute('aria-haspopup', 'dialog');
+            item.setAttribute('aria-label', `Open ${title}`);
+
+            if (imgElement) {
+                imgElement.loading = 'lazy';
+                imgElement.decoding = 'async';
+            }
+
+            item.addEventListener('click', (e) => {
+                // Pass the clicked .thumbnail DIV to the openModal function
+                openModal(e.currentTarget); 
+            });
+
+            item.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openModal(item);
+                }
+            });
+        });
+
+        // Listen for click on hero play button
+        if (heroPlayButton) {
+            heroPlayButton.setAttribute('aria-label', 'Play featured video');
+            heroPlayButton.addEventListener('click', () => {
+                openModal(heroPlayButton);
+            });
+        }
+
+        if (heroMoreInfoButton) {
+            heroMoreInfoButton.addEventListener('click', () => {
+                const targetSelector = heroMoreInfoButton.getAttribute('data-scroll-target');
+                const targetElement = targetSelector ? document.querySelector(targetSelector) : null;
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        }
+
+        // Close modal listeners
+        modalCloseBtn.addEventListener('click', closeModal);
+        modalBackdrop.addEventListener('click', (e) => {
+            // Only close if clicking on the backdrop itself, not the modal content
+            if (e.target === modalBackdrop) {
+                closeModal();
+            }
+        });
+
+        // Listen for 'Escape' key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modalBackdrop.classList.contains('hidden')) {
+                closeModal();
+            }
+
+            if (e.key === 'Tab' && !modalBackdrop.classList.contains('hidden')) {
+                const focusableElements = getFocusableElements();
+                if (!focusableElements.length) {
+                    return;
+                }
+
+                const firstElement = focusableElements[0];
+                const lastElement = focusableElements[focusableElements.length - 1];
+
+                if (e.shiftKey && document.activeElement === firstElement) {
+                    e.preventDefault();
+                    lastElement.focus();
+                } else if (!e.shiftKey && document.activeElement === lastElement) {
+                    e.preventDefault();
+                    firstElement.focus();
+                }
+            }
+        });
+
+        window.addEventListener('scroll', syncHeaderOnScroll, { passive: true });
+        syncHeaderOnScroll();
+
+    </script>
+
+</body>
+</html>
+
