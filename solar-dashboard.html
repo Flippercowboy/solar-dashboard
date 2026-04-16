@@ -196,9 +196,9 @@
       stroke-dashoffset: 0;
     }
     .flow-path.solar-flow   { stroke: var(--solar); }
-    .flow-path.battery-flow { stroke: var(--green); }
+    .flow-path.battery-flow { stroke: var(--purple); }
     .flow-path.grid-flow    { stroke: var(--blue); }
-    .flow-path.home-flow    { stroke: var(--purple); }
+    .flow-path.home-flow    { stroke: var(--green); }
     .flow-path.reverse      { animation-direction: reverse; }
     .flow-path.active       { animation: flowAnim 1s linear infinite; }
     .flow-path.slow         { animation: flowAnim 2s linear infinite; }
@@ -336,7 +336,6 @@
 <!-- ══════════════ HEADER ══════════════ -->
 <header>
   <div class="logo">
-    <a href="/" style="font-size:.8rem;color:#8b949e;text-decoration:none;margin-right:16px;letter-spacing:.05em;">← jprbuilds.com</a>
     <span>☀️ <em>Solar</em> Dashboard</span>
   </div>
   <div class="header-right">
@@ -454,7 +453,7 @@
             <!-- Inverter → Home -->
             <path id="path-inv-home" class="flow-path home-flow" d="M 315,140 C 370,120 390,80 390,60"/>
             <!-- Inverter ↔ Battery -->
-            <path id="path-inv-batt" class="flow-path battery-flow" d="M 135,245 C 160,230 200,210 205,160"/>
+            <path id="path-inv-batt" class="flow-path battery-flow" d="M 240,190 C 200,210 160,230 135,245"/>
             <!-- Inverter ↔ Grid -->
             <path id="path-inv-grid" class="flow-path grid-flow" d="M 315,180 C 360,200 400,230 390,245"/>
           </svg>
@@ -761,12 +760,22 @@ const DEFAULT_HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkOWExY
 let HA_URL   = localStorage.getItem('solar_ha_url')   || DEFAULT_HA_URL;
 let HA_TOKEN = localStorage.getItem('solar_ha_token') || DEFAULT_HA_TOKEN;
 
-const REFRESH_INTERVAL = 15; // seconds
-let countdown = REFRESH_INTERVAL;
-let refreshTimer = null;
 let monthlyChartInstance = null;
 let yearlyChartInstance  = null;
 let monthlyDataLoaded    = false;
+
+// ══════════════════════════════════════
+//  WEBSOCKET ENGINE
+// ══════════════════════════════════════
+let ws = null;
+let wsId = 1;
+let wsReconnectTimer = null;
+let wsReconnectDelay = 3000;
+let wsPingTimer = null;
+
+function wsUrl() {
+  return HA_URL.replace(/^http/, 'ws') + '/api/websocket';
+}
 
 // Always hide setup overlay on load — credentials are pre-configured
 document.getElementById('setup-overlay').classList.add('hidden');
@@ -792,99 +801,22 @@ function openSettings() {
 }
 
 // ══════════════════════════════════════
-//  HA API helpers
+//  HA REST (for statistics only)
 // ══════════════════════════════════════
-async function haGet(path) {
-  const r = await fetch(`/solar/proxy.php?path=${encodeURIComponent(path)}`);
-  if (!r.ok) throw new Error(`Proxy ${r.status} ${path}`);
-  return r.json();
-}
-
 async function haPost(path, body) {
-  const r = await fetch(`/solar/proxy.php?path=${encodeURIComponent(path)}`, {
+  const r = await fetch(`${HA_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!r.ok) throw new Error(`Proxy ${r.status} ${path}`);
+  if (!r.ok) throw new Error(`HA ${r.status} ${path}`);
   return r.json();
 }
 
-function sv(eid) { return haGet(`/api/states/${eid}`); }
-
 // ══════════════════════════════════════
-//  ENTITIES TO FETCH
-// ══════════════════════════════════════
-const LIVE_ENTITIES = [
-  'sensor.solis_ac_output_total_power',
-  'sensor.solis_dc_power_pv1',
-  'sensor.solis_dc_power_pv2',
-  'sensor.solis_dc_voltage_pv1',
-  'sensor.solis_dc_current_pv1',
-  'sensor.solis_dc_voltage_pv2',
-  'sensor.solis_dc_current_pv2',
-  'sensor.solis_battery_power',
-  'sensor.solis_remaining_battery_capacity',
-  'sensor.solis_battery_state_of_health',
-  'sensor.solis_battery_voltage',
-  'sensor.solis_battery_current',
-  'sensor.solis_force_charge_soc',
-  'sensor.solis_force_discharge_soc',
-  'sensor.solis_power_grid_total_power',
-  'sensor.solis_grid_phase1_power',
-  'sensor.solis_meter_item_a_volt',
-  'sensor.solis_meter_item_a_current',
-  'sensor.solis_total_consumption_power',
-  'sensor.solis_plant_total_consumption_power',
-  'sensor.solis_backup_load_power',
-  'sensor.solis_temperature',
-  'sensor.solis_ac_voltage_r',
-  'sensor.solis_ac_current_r',
-  'sensor.solis_ac_frequency',
-  'sensor.solis_energy_today',
-  'sensor.solis_energy_this_month',
-  'sensor.solis_energy_this_year',
-  'sensor.solis_energy_total',
-  'sensor.solis_daily_on_grid_energy',
-  'sensor.solis_daily_grid_energy_purchased',
-  'sensor.solis_daily_energy_charged',
-  'sensor.solis_daily_energy_discharged',
-  'sensor.solis_monthly_on_grid_energy',
-  'sensor.solis_monthly_grid_energy_purchased',
-  'sensor.solis_monthly_energy_charged',
-  'sensor.solis_monthly_energy_discharged',
-  'sensor.solis_yearly_on_grid_energy',
-  'sensor.solis_yearly_grid_energy_purchased',
-  'sensor.solis_total_on_grid_energy',
-  'sensor.solis_total_energy_purchased',
-  'sensor.solis_total_energy_charged',
-  'sensor.solis_total_energy_discharged',
-  'sensor.solcast_pv_forecast_power_now',
-  'sensor.solcast_pv_forecast_peak_forecast_today',
-  'sensor.solcast_pv_forecast_peak_time_today',
-  'sensor.solcast_pv_forecast_forecast_today',
-  'sensor.solcast_pv_forecast_forecast_tomorrow',
-  'sensor.solcast_pv_forecast_forecast_day_3',
-  'sensor.solcast_pv_forecast_forecast_day_4',
-  'sensor.solcast_pv_forecast_forecast_day_5',
-  'sensor.solcast_pv_forecast_forecast_day_6',
-  'sensor.solcast_pv_forecast_forecast_day_7',
-  'sensor.best_solar_month',
-  'input_number.max_daily_solar_yield_30_days',
-];
-
-// ══════════════════════════════════════
-//  FETCH ALL STATES IN ONE CALL
+//  STATE MAP  (populated via WebSocket)
 // ══════════════════════════════════════
 let stateMap = {};
-
-async function fetchAllStates() {
-  // HA supports GET /api/states which returns all states — we'll filter client-side
-  const all = await haGet('/api/states');
-  stateMap = {};
-  for (const s of all) { stateMap[s.entity_id] = s; }
-  return stateMap;
-}
 
 function num(eid, def = 0) {
   const s = stateMap[eid];
@@ -895,6 +827,97 @@ function num(eid, def = 0) {
 function str(eid, def = '—') {
   const s = stateMap[eid];
   return s ? s.state : def;
+}
+
+// ══════════════════════════════════════
+//  WEBSOCKET CONNECTION
+// ══════════════════════════════════════
+function connectWS() {
+  clearTimeout(wsReconnectTimer);
+  clearInterval(wsPingTimer);
+  if (ws) { try { ws.close(); } catch(e) {} }
+
+  setBadge(false, 'Connecting…');
+  ws = new WebSocket(wsUrl());
+
+  ws.onopen = () => {
+    console.log('WS open');
+    wsReconnectDelay = 3000;
+  };
+
+  ws.onmessage = (evt) => {
+    const msg = JSON.parse(evt.data);
+
+    // Step 1: auth required
+    if (msg.type === 'auth_required') {
+      ws.send(JSON.stringify({ type: 'auth', access_token: HA_TOKEN }));
+      return;
+    }
+
+    // Step 2: auth ok — subscribe to all entity state changes
+    if (msg.type === 'auth_ok') {
+      console.log('WS auth OK, HA version:', msg.ha_version);
+      // Subscribe to state-changed events
+      ws.send(JSON.stringify({ id: wsId++, type: 'subscribe_events', event_type: 'state_changed' }));
+      // Also fetch all current states snapshot
+      ws.send(JSON.stringify({ id: wsId++, type: 'get_states' }));
+      // Keep-alive ping every 30s
+      wsPingTimer = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ id: wsId++, type: 'ping' }));
+        }
+      }, 30000);
+      return;
+    }
+
+    if (msg.type === 'auth_invalid') {
+      setBadge(false, 'Auth failed');
+      console.error('WS auth invalid');
+      return;
+    }
+
+    // Step 3: result from get_states — bulk populate stateMap
+    if (msg.type === 'result' && Array.isArray(msg.result)) {
+      stateMap = {};
+      for (const s of msg.result) { stateMap[s.entity_id] = s; }
+      updateLiveUI();
+      renderYearlyChart();
+      setBadge(true, 'Live');
+      document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB')}`;
+      return;
+    }
+
+    // Step 4: real-time state_changed events
+    if (msg.type === 'event' && msg.event && msg.event.event_type === 'state_changed') {
+      const ns = msg.event.data.new_state;
+      if (ns) {
+        stateMap[ns.entity_id] = ns;
+        // Only re-render if it's one of our solar entities
+        if (ns.entity_id.startsWith('sensor.solis') ||
+            ns.entity_id.startsWith('sensor.solcast') ||
+            ns.entity_id.startsWith('sensor.best_solar') ||
+            ns.entity_id.startsWith('input_number.max_daily')) {
+          updateLiveUI();
+          document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB')}`;
+        }
+      }
+    }
+  };
+
+  ws.onerror = (e) => {
+    console.error('WS error', e);
+    setBadge(false, 'Error');
+  };
+
+  ws.onclose = (e) => {
+    clearInterval(wsPingTimer);
+    setBadge(false, `Reconnecting…`);
+    console.warn('WS closed, reconnecting in', wsReconnectDelay, 'ms');
+    wsReconnectTimer = setTimeout(() => {
+      wsReconnectDelay = Math.min(wsReconnectDelay * 1.5, 30000);
+      connectWS();
+    }, wsReconnectDelay);
+  };
 }
 
 // ══════════════════════════════════════
@@ -1091,8 +1114,8 @@ function updateFlowPaths(pvW, battW, gridW, homeW) {
 
   setFlow('path-solar-inv', pvW > 50, pvW > 2000, false);
   setFlow('path-inv-home',  homeW > 50, homeW > 2000, false);
-  setFlow('path-inv-batt',  Math.abs(battW) > 50, Math.abs(battW) > 2000, battW < 0); // < 0 = discharging
-  setFlow('path-inv-grid',  Math.abs(gridW) > 50, Math.abs(gridW) > 1000, gridW < 0); // < 0 = importing
+  setFlow('path-inv-batt',  Math.abs(battW) > 50, Math.abs(battW) > 2000, battW > 0); // > 0 = discharging → Battery→Inverter
+  setFlow('path-inv-grid',  Math.abs(gridW) > 50, Math.abs(gridW) > 1000, gridW > 0); // > 0 = importing → Grid→Inverter
 }
 
 // ══════════════════════════════════════
@@ -1293,46 +1316,19 @@ function renderYearlyChart() {
 }
 
 // ══════════════════════════════════════
-//  MAIN REFRESH LOOP
+//  BADGE + INIT
 // ══════════════════════════════════════
-async function refresh() {
-  try {
-    await fetchAllStates();
-    updateLiveUI();
-    setBadge(true);
-    document.getElementById('last-updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB')}`;
-  } catch(e) {
-    console.error('Refresh failed:', e);
-    setBadge(false);
-    document.getElementById('last-updated').textContent = `Error: ${e.message}`;
-  }
-}
-
-function setBadge(online) {
+function setBadge(online, label) {
   const b = document.getElementById('live-badge');
   const t = document.getElementById('live-text');
   b.className = `live-badge ${online ? '' : 'offline'}`;
-  t.textContent = online ? 'Live' : 'Offline';
+  t.textContent = label || (online ? 'Live' : 'Offline');
+  // Hide old countdown — WS is push-based
+  document.getElementById('refresh-countdown').textContent = online ? '🔴 Real-time' : '';
 }
 
-function startCountdown() {
-  clearInterval(refreshTimer);
-  countdown = REFRESH_INTERVAL;
-  refreshTimer = setInterval(() => {
-    countdown--;
-    document.getElementById('refresh-countdown').textContent = `Refresh in ${countdown}s`;
-    if (countdown <= 0) {
-      countdown = REFRESH_INTERVAL;
-      refresh();
-    }
-  }, 1000);
-}
-
-async function initDashboard() {
-  document.getElementById('live-text').textContent = 'Connecting…';
-  await refresh();
-  renderYearlyChart();
-  startCountdown();
+function initDashboard() {
+  connectWS();
 }
 
 // ══════════════════════════════════════
