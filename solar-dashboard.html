@@ -863,7 +863,7 @@ function updateLiveUI() {
   const acPower   = num('sensor.solis_ac_output_total_power');
   const pv1       = num('sensor.solis_dc_power_pv1');
   const pv2       = num('sensor.solis_dc_power_pv2');
-  const totalPV   = pv1 + pv2;
+  const totalPV   = acPower; // Use AC output as Solis API doesn't provide DC string data
   const battPower = num('sensor.solis_battery_power');
   const battSoc   = num('sensor.solis_remaining_battery_capacity');
   const gridPower = num('sensor.solis_power_grid_total_power');
@@ -883,7 +883,7 @@ function updateLiveUI() {
   // Live cards
   setEl('live-gen', `${fmtW(totalPV)}<span class="card-unit">${fmtWu(totalPV)}</span>`);
   document.getElementById('live-gen').innerHTML = `${fmtW(totalPV)}<span class="card-unit">${fmtWu(totalPV)}</span>`;
-  setEl('live-gen-sub', `PV1: ${Math.round(pv1)}W · PV2: ${Math.round(pv2)}W`);
+  setEl('live-gen-sub', `AC output power`);
 
   document.getElementById('live-home').innerHTML = `${fmtW(homePower)}<span class="card-unit">${fmtWu(homePower)}</span>`;
   setEl('live-home-sub', 'Current load');
