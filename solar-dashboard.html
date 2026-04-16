@@ -795,20 +795,18 @@ function openSettings() {
 //  HA API helpers
 // ══════════════════════════════════════
 async function haGet(path) {
-  const r = await fetch(`${HA_URL}${path}`, {
-    headers: { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' }
-  });
-  if (!r.ok) throw new Error(`HA ${r.status} ${path}`);
+  const r = await fetch(`/solar/proxy.php?path=${encodeURIComponent(path)}`);
+  if (!r.ok) throw new Error(`Proxy ${r.status} ${path}`);
   return r.json();
 }
 
 async function haPost(path, body) {
-  const r = await fetch(`${HA_URL}${path}`, {
+  const r = await fetch(`/solar/proxy.php?path=${encodeURIComponent(path)}`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${HA_TOKEN}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  if (!r.ok) throw new Error(`HA ${r.status} ${path}`);
+  if (!r.ok) throw new Error(`Proxy ${r.status} ${path}`);
   return r.json();
 }
 
