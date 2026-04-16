@@ -790,12 +790,21 @@ function str(eid, def = '—') {
 // ══════════════════════════════════════
 //  FETCH FROM SOLIS PROXY
 // ══════════════════════════════════════
+let solcastData = null;
+
 async function fetchAllStates() {
-  const r = await fetch('/solar/proxy.php?action=states');
-  if (!r.ok) throw new Error(`Proxy error ${r.status}`);
-  const arr = await r.json();
+  const [statesRes, forecastRes] = await Promise.all([
+    fetch('/solar/proxy.php?action=states'),
+    fetch('/solar/proxy.php?action=forecast')
+  ]);
+  if (!statesRes.ok) throw new Error(`Proxy error ${statesRes.status}`);
+  const arr = await statesRes.json();
   stateMap = {};
   for (const s of arr) { stateMap[s.entity_id] = s; }
+  if (forecastRes.ok) {
+    const fc = await forecastRes.json();
+    solcastData = fc.forecasts || [];
+  }
   return stateMap;
 }
 
@@ -875,10 +884,29 @@ function updateLiveUI() {
   const todayImp   = num('sensor.solis_daily_grid_energy_purchased');
   const todayChrg  = num('sensor.solis_daily_energy_charged');
   const todayDischrg = num('sensor.solis_daily_energy_discharged');
-  const forecastTd = num('sensor.solcast_pv_forecast_forecast_today');
-  const forecastNow= num('sensor.solcast_pv_forecast_power_now');
-  const forecastPk = num('sensor.solcast_pv_forecast_peak_forecast_today');
-  const forecastPkT= str('sensor.solcast_pv_forecast_peak_time_today');
+  // Solcast — derive from raw forecast data
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  let forecastTd = 0, forecastNow = 0, forecastPk = 0, forecastPkT = null;
+  if (solcastData && solcastData.length) {
+    // Sum today's 30-min slots (kW * 0.5h = kWh each)
+    solcastData.forEach(f => {
+      const d = new Date(f.period_end);
+      if (d.toISOString().slice(0, 10) === todayStr) {
+        forecastTd += (f.pv_estimate || 0) * 0.5;
+        if ((f.pv_estimate || 0) > forecastPk) {
+          forecastPk = f.pv_estimate;
+          forecastPkT = f.period_end;
+        }
+      }
+    });
+    // Find nearest slot to now for current forecast
+    const nearest = solcastData.reduce((prev, curr) => {
+      return Math.abs(new Date(curr.period_end) - now) < Math.abs(new Date(prev.period_end) - now) ? curr : prev;
+    });
+    forecastNow = Math.round((nearest.pv_estimate || 0) * 1000); // kW to W
+    forecastPk  = Math.round(forecastPk * 1000); // kW to W
+  }
 
   // Live cards
   setEl('live-gen', `${fmtW(totalPV)}<span class="card-unit">${fmtWu(totalPV)}</span>`);
@@ -910,9 +938,9 @@ function updateLiveUI() {
   setEl('today-charged', fmtN(todayChrg));
 
   // Forecast now
-  document.getElementById('forecast-now').innerHTML = `${Math.round(forecastNow)}<span class="card-unit">W</span>`;
-  setEl('forecast-peak', Math.round(forecastPk));
-  setEl('forecast-peak-time', fmtTime(forecastPkT));
+  document.getElementById('forecast-now').innerHTML = `${forecastNow}<span class="card-unit">W</span>`;
+  setEl('forecast-peak', forecastPk);
+  setEl('forecast-peak-time', forecastPkT ? new Date(forecastPkT).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}) : '—');
 
   // Power flow SVG
   setEl('svg-solar', `${Math.round(totalPV)} W`);
@@ -1028,24 +1056,26 @@ function updateFlowPaths(pvW, battW, gridW, homeW) {
 //  7-DAY FORECAST
 // ══════════════════════════════════════
 function updateForecastDays() {
-  const eids = [
-    { label: 'Today',    eid: 'sensor.solcast_pv_forecast_forecast_today' },
-    { label: 'Tomorrow', eid: 'sensor.solcast_pv_forecast_forecast_tomorrow' },
-    { label: null,       eid: 'sensor.solcast_pv_forecast_forecast_day_3' },
-    { label: null,       eid: 'sensor.solcast_pv_forecast_forecast_day_4' },
-    { label: null,       eid: 'sensor.solcast_pv_forecast_forecast_day_5' },
-    { label: null,       eid: 'sensor.solcast_pv_forecast_forecast_day_6' },
-    { label: null,       eid: 'sensor.solcast_pv_forecast_forecast_day_7' },
-  ];
-  const maxVal = Math.max(...eids.map((_,i) => num(eids[i]?.eid || '') || 0));
+  if (!solcastData || !solcastData.length) return;
+
+  // Group forecast by day and sum kWh (each slot is 30min = 0.5h)
+  const dayTotals = {};
+  solcastData.forEach(f => {
+    const day = new Date(f.period_end).toISOString().slice(0, 10);
+    dayTotals[day] = (dayTotals[day] || 0) + (f.pv_estimate || 0) * 0.5;
+  });
+
+  const days = Object.keys(dayTotals).sort().slice(0, 7);
+  const maxVal = Math.max(...days.map(d => dayTotals[d]), 1);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   let html = '';
-  eids.forEach((item, i) => {
-    const val = num(item.eid);
-    const label = item.label || dayName(i);
-    const isToday = i === 0;
+  days.forEach((day, i) => {
+    const val = dayTotals[day];
+    const isToday = day === todayStr;
+    const label = isToday ? 'Today' : i === 1 ? 'Tomorrow' : new Date(day).toLocaleDateString('en-GB', { weekday: 'short' });
     const icon = val >= 30 ? '☀️' : val >= 20 ? '🌤' : val >= 10 ? '⛅' : '☁️';
-    const pct  = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
+    const pct  = Math.round((val / maxVal) * 100);
     html += `
       <div class="forecast-day ${isToday ? 'today' : ''}">
         <div class="fd-day">${label}</div>
